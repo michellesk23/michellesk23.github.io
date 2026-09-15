@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS 180: Project 1 - Images of the Russian Empire</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #222;
+            background-color: #fae3f1;
+            margin: 0;
+            padding: 20px 40px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background:  #fae3f1;
+            padding: 40px 50px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        h1, h2, h3 {
+            color: #111;
+            font-weight: 600;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 35px;
+            font-size: 1.1em;
+        }
+
+        .description-box {
+            background-color: #f7f9fa;
+            border-left: 4px solid #0055a5;
+            padding: 18px 24px;
+            margin-bottom: 40px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card-content {
+            padding: 14px 16px;
+            font-size: 0.9em;
+            background: #fff;
+            flex-grow: 1;
+        }
+
+        .card-title {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .offset-info {
+            color: #444;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.88em;
+            line-height: 1.5;
+        }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: #e1e4e8;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Project 1: Images of the Russian Empire</h1>
+    <div class="subtitle">Colorizing the Prokudin-Gorskii Photo Collection | CS 180 (Intro to Computer Vision)</div>
+
+    <!-- Description Section -->
+    <div class="description-box">
+        <h3>Overview & Approach</h3>
+        <p>
+            <!-- WRITE YOUR DESCRIPTION HERE -->
+            Sergei Mikhailovich Prokudin-Gorskii recorded three-color exposures on glass plates across early 20th-century Russia.
+            The goal of this project is to take the digitized glass plate scans, extract the three monochrome color channels (B, G, R),
+            and automatically align them to produce a color photograph with minimal artifacts.
+        </p>
+        <p>
+            <!-- WRITE YOUR ALIGNMENT DETAILS HERE -->
+            For small images, an exhaustive search over a [-15, 15] displacement window using Sum of Squared Differences (SSD) was implemented.
+            For larger glass plate scans, an image pyramid was used to recursively downscale images, compute coarse offsets cheaply,
+            and iteratively refine displacements at higher resolutions while cropping outer borders to eliminate edge roll artifacts.
+        </p>
+    </div>
+
+    <!-- Section 1: Single Scale -->
+    <h2>Part 1: Single-Scale Alignment (Small Images)</h2>
+    <p>Exhaustive window search over displacements [-15, 15] on lower-resolution images.</p>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./media/single/cathedral.jpg" alt="cathedral.jpg">
+            <div class="card-content">
+                <div class="card-title">cathedral.jpg</div>
+                <div class="offset-info">
+                    Green: (5, 2)<br>
+                    Red: (12, 3)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/single/monastery.jpg" alt="monastery.jpg">
+            <div class="card-content">
+                <div class="card-title">monastery.jpg</div>
+                <div class="offset-info">
+                    Green: (-3, 2)<br>
+                    Red: (3, 2)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/single/tobolsk.jpg" alt="tobolsk.jpg">
+            <div class="card-content">
+                <div class="card-title">tobolsk.jpg</div>
+                <div class="offset-info">
+                    Green: (3, 3)<br>
+                    Red: (6, 3)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 2: Multiscale Pyramid (Required Examples) -->
+    <h2>Part 2: Multiscale Image Pyramid Alignment (Provided Examples)</h2>
+    <p>Recursive coarse-to-fine displacement estimation using Gaussian pyramids for high-resolution plate scans.</p>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./media/pyramid/cathedral.jpg" alt="cathedral.jpg">
+            <div class="card-content">
+                <div class="card-title">cathedral.jpg</div>
+                <div class="offset-info">
+                    Green: (5, 2)<br>
+                    Red: (12, 3)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/church.jpg" alt="church.jpg">
+            <div class="card-content">
+                <div class="card-title">church.jpg</div>
+                <div class="offset-info">
+                    Green: (25, 4)<br>
+                    Red: (58, -4)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/emir.jpg" alt="emir.jpg">
+            <div class="card-content">
+                <div class="card-title">emir.jpg</div>
+                <div class="offset-info">
+                    Green: (49, 24)<br>
+                    Red: (26, -829)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/harvesters.jpg" alt="harvesters.jpg">
+            <div class="card-content">
+                <div class="card-title">harvesters.jpg</div>
+                <div class="offset-info">
+                    Green: (59, 16)<br>
+                    Red: (123, 13)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/icon.jpg" alt="icon.jpg">
+            <div class="card-content">
+                <div class="card-title">icon.jpg</div>
+                <div class="offset-info">
+                    Green: (41, 17) <br>
+                    Red: (89, 23)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/ilemselga.jpg" alt="ilemselga.jpg">
+            <div class="card-content">
+                <div class="card-title">ilemselga.jpg</div>
+                <div class="offset-info">
+                    Green: (40, 7)<br>
+                    Red: (130, 11)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/melons.jpg" alt="melons.jpg">
+            <div class="card-content">
+                <div class="card-title">melons.jpg</div>
+                <div class="offset-info">
+                    Green: (81, 10)<br>
+                    Red: (178, 13)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/monastery.jpg" alt="monastery.jpg">
+            <div class="card-content">
+                <div class="card-title">monastery.jpg</div>
+                <div class="offset-info">
+                    Green: (-3, 2)<br>
+                    Red: (3, 2)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/religous_painting.jpg" alt="religious painting">
+            <div class="card-content">
+                <div class="card-title">religious_painting.jpg</div>
+                <div class="offset-info">
+                    Green: (27, 3)<br>
+                    Red: (68, 7)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/self_portrait.jpg" alt="self portrait">
+            <div class="card-content">
+                <div class="card-title">self_portrait.jpg</div>
+                <div class="offset-info">
+                    Green: (78, 29)<br>
+                    Red: (176, 37)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/siren.jpg" alt="siren.jpg">
+            <div class="card-content">
+                <div class="card-title">siren.jpg</div>
+                <div class="offset-info">
+                    Green: (49, -6)<br>
+                    Red: (95, -25)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/three_generations.jpg" alt="three generations">
+            <div class="card-content">
+                <div class="card-title">three_generations.jpg</div>
+                <div class="offset-info">
+                    Green: [53, 14]<br>
+                    Red: [112, 11]
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/tobolsk.jpg" alt="tobolsk.jpg">
+            <div class="card-content">
+                <div class="card-title">tobolsk.jpg</div>
+                <div class="offset-info">
+                    Green: [3, 3]<br>
+                    Red: [6, 3]
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/wharf.jpg" alt="wharf.jpg">
+            <div class="card-content">
+                <div class="card-title">wharf.jpg</div>
+                <div class="offset-info">
+                    Green: (15, -7)<br>
+                    Red: (82, -16)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 3: Extra Images (Pyramid) -->
+    <h2>Part 3: Additional Prokudin-Gorskii Images (Pyramid)</h2>
+    <p>Extra collection images aligned using the multiscale image pyramid algorithm.</p>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./media/pyramid/canal.jpg" alt="canal.jpg">
+            <div class="card-content">
+                <div class="card-title">canal.jpg</div>
+                <div class="offset-info">
+                    Green: (28, 24)<br>
+                    Red: (46, 48)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/peonies.jpg" alt="peonies.jpg">
+            <div class="card-content">
+                <div class="card-title">peonies.jpg</div>
+                <div class="offset-info">
+                    Green: (51, 3)<br>
+                    Red: (104, -6)
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/pyramid/roses.jpg" alt="roses.jpg">
+            <div class="card-content">
+                <div class="card-title">roses.jpg</div>
+                <div class="offset-info">
+                    Green: (31, 20)<br>
+                    Red: (82, 35)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
