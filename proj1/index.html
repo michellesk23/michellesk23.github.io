@@ -1,26 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CS 180: Project 1 - Images of the Russian Empire</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
             color: #222;
             background-color: #fae3f1;
-            margin: 0;
+            margin: 0 auto;
+            max-width: 1100px;
             padding: 20px 40px;
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            background:  #fae3f1;
-            padding: 40px 50px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
         }
 
         h1, h2, h3 {
@@ -40,20 +44,21 @@
             font-size: 1.1em;
         }
 
-        .description-box {
-            background-color: #f7f9fa;
-            border-left: 4px solid #0055a5;
-            padding: 18px 24px;
-            margin-bottom: 40px;
-            border-radius: 0 4px 4px 0;
-        }
-
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
             gap: 25px;
             margin-top: 20px;
             margin-bottom: 50px;
+        }
+
+        /* 2-column layout for side-by-side comparison */
+        .comparison-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+            margin-bottom: 30px;
         }
 
         .card {
@@ -97,37 +102,47 @@
         hr {
             border: 0;
             height: 1px;
-            background: #e1e4e8;
+            background: #d4b2c9;
             margin: 40px 0;
+        }
+
+        .failure-analysis {
+            margin-bottom: 60px;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Project 1: Images of the Russian Empire</h1>
-    <div class="subtitle">Colorizing the Prokudin-Gorskii Photo Collection | CS 180 (Intro to Computer Vision)</div>
+    <a href="../index.html" class="back-link">&larr; Back to Portfolio</a>
 
-    <!-- Description Section -->
-    <div class="description-box">
-        <h3>Overview & Approach</h3>
-        <p>
-            <!-- WRITE YOUR DESCRIPTION HERE -->
-            Sergei Mikhailovich Prokudin-Gorskii recorded three-color exposures on glass plates across early 20th-century Russia.
-            The goal of this project is to take the digitized glass plate scans, extract the three monochrome color channels (B, G, R),
-            and automatically align them to produce a color photograph with minimal artifacts.
-        </p>
-        <p>
-            <!-- WRITE YOUR ALIGNMENT DETAILS HERE -->
-            For small images, an exhaustive search over a [-15, 15] displacement window using Sum of Squared Differences (SSD) was implemented.
-            For larger glass plate scans, an image pyramid was used to recursively downscale images, compute coarse offsets cheaply,
-            and iteratively refine displacements at higher resolutions while cropping outer borders to eliminate edge roll artifacts.
-        </p>
-    </div>
+    <h1>Project 1: Images of the Russian Empire</h1>
+    <div class="subtitle">Colorizing the Prokudin-Gorskii Photo Collection</div>
+
+    <!-- Overview Section -->
+    <h2>Overview & Approach</h2>
+    <p>
+        Sergei Mikhailovich Prokudin-Gorskii recorded three-color exposures on glass plates (using red, blue, and green filters) across early 20th-century Russia.
+        In this project, I aim to take the digitized glass plate scans, extract the three color channels (B, G, R),
+        and automatically align them to produce a color image.
+    </p>
+    <p>
+        I read in each glass plate scan as a grayscale image, and then separate it up into the 3 color channels - blue, green, and red, by evenly splitting up the image into thirds. 
+        I then use blue as a fixed reference, and separately find the optimal displacements for the red and green channels that would result in the most aligned image once the channels are stacked on top of one another.
+    </p>
+    <p>
+        For small images in a JPG format, I perform an exhaustive search over a [-15, 15] displacement window. The metric used to compute the minimum displacement is the L2 norm, or Euclidean Distance, which has the following equation:
+        $$ \text{Euclidean Distance} = \sqrt{\sum \big(C_1 - C_2\big)^2} $$
+
+        For larger images in a TIF format, I use an image pyramid to recursively downscale images, compute the optimal offsets on the resulting blurrier images, and then refine the displacements at higher resolutions.
+    </p>
+
+    <hr>
 
     <!-- Section 1: Single Scale -->
     <h2>Part 1: Single-Scale Alignment (Small Images)</h2>
-    <p>Exhaustive window search over displacements [-15, 15] on lower-resolution images.</p>
+    <p>
+        For smaller, lower-resolution JPG images, I used a displacement window of [-15, 15] to shift my red and green channels, both vertically and horizontally, to test which displacements would result in the best alignment between the channels.
+    </p>
 
     <div class="gallery">
         <div class="card">
@@ -164,11 +179,58 @@
         </div>
     </div>
 
+    <!-- Sub-section: Cropping Comparison -->
+    <h3>Implementing Cropping</h3>
+    <p>
+        Initially, the output of <code>monastery.jpg</code> was noticeably misaligned. Because of this, I implemented cropping into my algorithm. 
+        Cropping each of the images by 10% for each margin prevents the edges of the images from skewing the results of the alignment. 
+        This is because the edges of the images are typically borders with extreme contrast, or wrapped-around pixels resulting from rolling the image during testing. 
+        Both of these distort the displacement metric, so cropping them out significantly improved the final aligned output:
+    </p>
+
+    <div class="comparison-gallery">
+        <div class="card">
+            <img src="./media/single/monastery_old.jpg" alt="monastery_old.jpg">
+            <div class="card-content">
+                <div class="card-title">monastery.jpg - before cropping </div>
+                <div class="offset-info">
+                    Green: (-6, 0)<br>
+                    Red: (9, 1)<br>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <img src="./media/single/monastery.jpg" alt="monastery.jpg">
+            <div class="card-content">
+                <div class="card-title">monastery.jpg - after cropping </div>
+                <div class="offset-info">
+                    Green: (-3, 2)<br>
+                    Red: (3, 2)<br>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <hr>
 
-    <!-- Section 2: Multiscale Pyramid (Required Examples) -->
-    <h2>Part 2: Multiscale Image Pyramid Alignment (Provided Examples)</h2>
-    <p>Recursive coarse-to-fine displacement estimation using Gaussian pyramids for high-resolution plate scans.</p>
+    <!-- Section 2: Image Pyramid (Required Examples) -->
+    <h2>Part 2: Image Pyramid Alignment (Provided Examples)</h2>
+    <p>
+        For larger, higher-resolution TIF images, the current single-scale alignment algorithm window is not large enough to handle the potential channel displacement these images may have. 
+        Extending the window is a potential solution, but this would be extremely inefficient, and thus not a viable solution to find the best alignment.
+    </p>
+    <p>
+        Instead, I implemented an image pyramid to more efficiently search for displacements. For each channel, I recursively resize the most recent level to be 1/2 of its current width and height, stopping once the shortest edge is less than 100 pixels. 
+        Throughout this rescaling, I also apply anti-aliasing, which filters out fine, high-frequency details from an image before sampling it at a lower resolution, preventing distorted patterns. 
+    </p>
+    <p>
+        When the image becomes small enough, this reduces to the single-scale case, where a displacement window of [-15, 15] is used to calculate the optimal displacement at this level.
+        Then for levels higher up, the optimal displacement computed at the previous level is used as the starting point for the current level to compute the optimal displacement. This continues until we reach the topmost level, and thus have computed the optimal displacement to align the channels.
+    </p>    
+    <p>
+        As in the single-scale alignment case, I cropped each image channel before computing the minimum displacement between the channels to prevent the edges from skewing the results.   
+    </p>    
 
     <div class="gallery">
         <div class="card">
@@ -220,7 +282,7 @@
             <div class="card-content">
                 <div class="card-title">icon.jpg</div>
                 <div class="offset-info">
-                    Green: (41, 17) <br>
+                    Green: (41, 17)<br>
                     Red: (89, 23)
                 </div>
             </div>
@@ -330,7 +392,7 @@
 
     <!-- Section 3: Extra Images (Pyramid) -->
     <h2>Part 3: Additional Prokudin-Gorskii Images (Pyramid)</h2>
-    <p>Extra collection images aligned using the multiscale image pyramid algorithm.</p>
+    <p>I selected 3 additional images from the Prokudin-Gorskii collection and also aligned them using the multiscale image pyramid algorithm.</p>
 
     <div class="gallery">
         <div class="card">
@@ -366,7 +428,22 @@
             </div>
         </div>
     </div>
-</div>
+
+    <hr>
+
+    <!-- Section 4: Failure Cases & Discussion -->
+    <div class="failure-analysis">
+        <h2>Failure Cases & Analysis</h2>
+        <p>
+            My algorithm failed at aligning the <code>emir.jpg</code> image. Specifically, it selected the shifts of (49, 24) for the green channel, and (26, -829) for the red channel. 
+            This was not the correct alignment for the red channel, and as a result, the red portion of the image is positioned significantly farther left from where it should be.
+        </p>
+        <p>
+            This is very likely caused by the brightness of the blue robe in the image, which will appear very bright in the blue channel, but almost black in the red channel. 
+            Because of this, the calculated displacement between the proper alignment of these channels is likely very high, and therefore is not considered to be the correct alignment. 
+            The algorithm instead tries to match the robed portion of the red channel to a dark portion of the background in the image. 
+        </p>
+    </div>
 
 </body>
 </html>
