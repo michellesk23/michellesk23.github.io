@@ -1,21 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>My Portfolio</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My CS180 Portfolio</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            font-size: 18px;
+            line-height: 1.5;
+            color: #2b1f27;
             background-color: #fae3f1;
+            margin: 0 auto;
+            max-width: 760px;
+            padding: 64px 40px;
+        }
+
+        h1 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-weight: normal;
+            font-size: 2.4em;
+            margin: 0 0 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2b1f27;
+        }
+
+        .projects {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .projects li {
+            border-bottom: 1px solid #d4b2c9;
+        }
+
+        .projects a {
+            display: flex;
+            align-items: baseline;
+            gap: 28px;
+            padding: 22px 4px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .num {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 2em;
+            color: #b04a85;
+            min-width: 1.4em;
+        }
+
+        .title {
+            font-size: 1.15em;
+        }
+
+        .projects a:hover .title {
+            text-decoration: underline;
+            text-decoration-color: #b04a85;
+            text-underline-offset: 4px;
+        }
+
+        .projects a:hover {
+            background-color: #f6d3e8;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                font-size: 16px;
+                padding: 36px 16px;
+            }
+            .projects a {
+                gap: 16px;
+            }
         }
     </style>
 </head>
 <body>
     <h1>Welcome to My CS180 Portfolio!</h1>
-    <ul>
-        <li><a href="./proj0/index.html">Project 0: Becoming Friends with Images</a></li>
-        <li><a href="./proj1/index.html">Project 1: Images of the Russian Empire -- Colorizing the Prokudin-Gorskii Photo Collection</a></li>
-        <li><a href="./proj2/index.html">Project 2: Fun with Filters and Frequencies!</a></li>
+
+    <ul class="projects">
+        <li>
+            <a href="./proj0/index.html">
+                <span class="num">0</span>
+                <span class="title">Becoming Friends with Images</span>
+            </a>
+        </li>
+        <li>
+            <a href="./proj1/index.html">
+                <span class="num">1</span>
+                <span class="title">Images of the Russian Empire: Colorizing the Prokudin-Gorskii Photo Collection</span>
+            </a>
+        </li>
+        <li>
+            <a href="./proj2/index.html">
+                <span class="num">2</span>
+                <span class="title">Fun with Filters and Frequencies!</span>
+            </a>
+        </li>
+        <li>
+            <a href="./proj3/index.html">
+                <span class="num">3</span>
+                <span class="title">Fun with Flow Models</span>
+            </a>
+        </li>
     </ul>
 </body>
 </html>

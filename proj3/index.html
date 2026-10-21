@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS 180: Project 3 - The Power of Flow Models</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #222;
+            background-color: #fae3f1;
+            margin: 0 auto;
+            max-width: 1100px;
+            padding: 20px 40px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        h1, h2, h3 {
+            color: #111;
+            font-weight: 600;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 35px;
+            font-size: 1.1em;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+            margin-bottom: 50px;
+        }
+
+        .comparison-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+
+        .plot {
+            max-width: 640px;
+        }
+
+        .wide {
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card img.distant {
+            width: 64px;
+            height: 64px;
+            margin: 24px auto;
+            border: 1px solid #eee;
+        }
+
+        .card-content {
+            padding: 14px 16px;
+            font-size: 0.9em;
+            background: #fff;
+            flex-grow: 1;
+        }
+
+        .card-title {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .offset-info {
+            color: #444;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 0.88em;
+            line-height: 1.5;
+        }
+
+        pre {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 14px 16px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.45;
+        }
+
+        code {
+            font-family: Consolas, "Courier New", monospace;
+        }
+
+        table {
+            border-collapse: collapse;
+            background: #fff;
+            margin: 20px 0 30px;
+            font-size: 0.92em;
+        }
+
+        th, td {
+            border: 1px solid #e1e4e8;
+            padding: 8px 14px;
+            text-align: left;
+        }
+
+        th {
+            background: #f6eef3;
+        }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: #d4b2c9;
+            margin: 40px 0;
+        }
+
+        .credits {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 60px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="back-link">&larr; Back to Portfolio</a>
+
+    <h1>Project 3: The Power of Flow Models</h1>
+    <div class="subtitle">Part A: Exploring a Pretrained Flow Model &middot; Part B: Flow Matching from Scratch</div>
+
+    <h2>Overview</h2>
+    <p>
+        A flow model generates an image by starting from pure Gaussian noise and following a learned velocity field until it reaches a clean image.
+        In Part A, I use a large pretrained text-to-image flow model (PixNerd-XXL) to see how this works: I add noise to images, denoise them in one step and iteratively,
+        generate new images, add classifier-free guidance, and then use the same sampler for image editing, visual anagrams, and hybrid images.
+        In Part B, I build and train my own UNet on MNIST: first as a single-step denoiser, then as a time-conditioned and class-conditioned flow matching model that generates digits from noise.
+    </p>
+    <p>
+        Throughout this project, \(t = 0\) is pure noise and \(t = 1\) is a clean image. Noisy images lie on the straight line between a noise sample \(\epsilon\) (or \(x_0\)) and a clean image \(x_1\):
+        $$ x_t = (1 - t)\,\epsilon + t\,x_1 $$
+        so the velocity along this path is constant: \(\frac{d}{dt}x_t = x_1 - \epsilon\).
+    </p>
+
+    <hr>
+
+    <h1>Part A: Exploring the Power of Flow Models</h1>
+
+    <p>
+        All Part A results use seed 180, an Euler step size of \(h = 0.02\), and the prompt <code>"a high quality photo"</code> unless noted otherwise.
+        For my own image, I used a photo I took of the Golden Gate Bridge at night.
+    </p>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./parta/golden_gate.jpg" alt="Golden Gate Bridge at night">
+            <div class="card-content">
+                <div class="card-title">My test image</div>
+                Center-cropped and resized to 512&times;512.
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <h2>Part 1.1: Constructing Noisy Training Inputs</h2>
+    <p>
+        The forward process blends the clean image with Gaussian noise. I sampled a single noise tensor \(\epsilon\) and reused it at \(t = 0.25, 0.5, 0.75\),
+        so all three noisy images lie on the same path from noise to my image. It's important to use the same \(\epsilon\) value because the ground-truth velocity in Part 1.4 is \(x_1 - \epsilon\),
+        which only matches these noisy images if it uses the exact same noise.
+    </p>
+
+<pre><code>def interpolate(image, noise, t):
+    return (1 - t) * noise + t * image
+
+epsilon = noise(SEED)
+noisy = {t: interpolate(image, epsilon, t) for t in [.25, .50, .75]}
+assert torch.equal(interpolate(image, epsilon, 0), epsilon)   # t = 0 is pure noise
+assert torch.equal(interpolate(image, epsilon, 1), image)     # t = 1 is the clean image</code></pre>
+
+    <p>
+        At \(t = 0.25\) the bridge is barely visible through the noise; by \(t = 0.75\) the image is mostly clean, with only some grain left.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/noisy_inputs.jpg" alt="Noisy inputs at three times">
+        <div class="card-content"><div class="card-title">Original image and noisy inputs at t = 0.25, 0.50, 0.75</div></div>
+    </div>
+
+    <hr>
+
+    <h2>Part 1.2: Classical Denoising</h2>
+    <p>
+        As a baseline, I tried to denoise each input without a model. Dividing by \(t\) restores the image's full brightness, but also scales up the noise:
+        $$ \frac{x_t}{t} = x_1 + \frac{1 - t}{t}\,\epsilon $$
+        The noise is multiplied by 3 at \(t = 0.25\), by 1 at \(t = 0.5\), and by about 0.33 at \(t = 0.75\). I then applied a Gaussian blur with
+        \(\sigma \in \{1, 2, 4, 8, 16\}\) and kept the one with the lowest mean squared error against the known clean image.
+        This is only possible because I know the clean image, so it is a best-case baseline rather than a real denoiser.
+    </p>
+
+    <table>
+        <tr><th>t</th><th>Noise scale after \(x/t\)</th><th>Best \(\sigma\)</th></tr>
+        <tr><td>0.25</td><td>3.0</td><td>8</td></tr>
+        <tr><td>0.50</td><td>1.0</td><td>4</td></tr>
+        <tr><td>0.75</td><td>0.33</td><td>2</td></tr>
+    </table>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./parta/blur_t025.jpg" alt="Blur at t=0.25">
+            <div class="card-content"><div class="card-title">t = 0.25</div><div class="offset-info">best &sigma; = 8</div></div>
+        </div>
+        <div class="card">
+            <img src="./parta/blur_t050.jpg" alt="Blur at t=0.5">
+            <div class="card-content"><div class="card-title">t = 0.50</div><div class="offset-info">best &sigma; = 4</div></div>
+        </div>
+        <div class="card">
+            <img src="./parta/blur_t075.jpg" alt="Blur at t=0.75">
+            <div class="card-content"><div class="card-title">t = 0.75</div><div class="offset-info">best &sigma; = 2</div></div>
+        </div>
+    </div>
+
+    <p>
+        The more noise there is, the larger the blur that minimizes the error, and the more real detail it destroys. At \(t = 0.25\), the tower and roadway survive only as blurry shapes,
+        covered in colored blotches: those are low-frequency parts of the noise, on the same scale as the image structure, so blurring cannot remove them.
+        At \(t = 0.75\), \(\sigma = 2\) keeps most of the scene but softens the cables and city lights. A Gaussian filter cannot tell noise from fine image detail; it removes all high frequencies equally.
+    </p>
+
+    <hr>
+
+    <h2>Part 1.3: One-Step Denoising</h2>
+    <p>
+        The flow model predicts the velocity \(\hat v_t = v_\theta(x_t, t, c)\). Since the path is a straight line, following that velocity for the remaining time \(1 - t\)
+        gives an estimate of the clean image in a single step:
+        $$ \hat x_1 = x_t + (1 - t)\,v_\theta(x_t, t, c) $$
+        I checked that the predicted velocity has the same shape, dtype, and device as the image.
+    </p>
+
+<pre><code>def one_step_denoise(x, t, condition, predict_velocity):
+    return x + (1 - t) * predict_velocity(x, t, condition)</code></pre>
+
+    <div class="wide card">
+        <img src="./parta/one_step_t025.jpg" alt="One step at t=0.25">
+        <div class="card-content"><div class="card-title">t = 0.25: original, noisy input, one-step estimate</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./parta/one_step_t050.jpg" alt="One step at t=0.5">
+        <div class="card-content"><div class="card-title">t = 0.50</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./parta/one_step_t075.jpg" alt="One step at t=0.75">
+        <div class="card-content"><div class="card-title">t = 0.75</div></div>
+    </div>
+
+    <p>
+        The one-step estimates are far better than the blur. Even at \(t = 0.25\), where the bridge is almost invisible, the model recovers the bridge structure, the lights on the bridge, and the dark water,
+        though the result is soft: the thin cables are mostly gone and the city lights are smeared. At \(t = 0.5\) nearly everything comes back, and at \(t = 0.75\) the estimate is hard to tell apart from the original.
+        The blurriness at low \(t\) is expected. Many clean images are consistent with a very noisy input, and a single prediction trained with a squared error lands near their average, which is blurry.
+    </p>
+
+    <hr>
+
+    <h2>Part 1.4: Visualizing Velocity</h2>
+    <p>
+        Here I compare what the model adds in one step, \((1 - t)\,\hat v_t\), with the update that would recover my exact image. Using the saved noise,
+        \(v_{\text{gt}} = x_1 - \epsilon\), so \((1 - t)\,v_{\text{gt}} = x_1 - x_t\). The error map is the RMS difference across RGB at each pixel:
+        $$ E_t = \sqrt{\operatorname{mean}_{\text{RGB}}\Big(\big[(1 - t)(\hat v_t - v_{\text{gt}})\big]^2\Big)} $$
+    </p>
+
+<pre><code>@torch.inference_mode()
+def velocity_diagnostics(x_t, t, clean_image, epsilon, condition, predict_velocity):
+    v_hat = predict_velocity(x_t, t, condition).float()
+    v_gt = (clean_image - epsilon).float()
+    predicted_update = (1 - t) * v_hat
+    ground_truth_update = (1 - t) * v_gt
+    error_map = ((predicted_update - ground_truth_update) ** 2).mean(dim=1).sqrt()
+    return predicted_update, ground_truth_update, error_map</code></pre>
+
+    <p>
+        Both updates are shown on one shared symmetric color scale with zero at middle gray, and all three error maps share one linear scale.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/velocity_t025.jpg" alt="Velocity at t=0.25">
+        <div class="card-content"><div class="card-title">t = 0.25: noisy input, predicted update, ground-truth update, error</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./parta/velocity_t050.jpg" alt="Velocity at t=0.5">
+        <div class="card-content"><div class="card-title">t = 0.50</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./parta/velocity_t075.jpg" alt="Velocity at t=0.75">
+        <div class="card-content"><div class="card-title">t = 0.75</div></div>
+    </div>
+
+    <p>
+        <b>The updates fade toward gray as \(t\) grows.</b> As \(x_t\) gets closer to the clean image, there is less left to add, and the \((1 - t)\) factor shrinks the update further.
+    </p>
+    <p>
+        <b>The structure matches.</b> The predicted and ground-truth updates contain the tower, roadway, and cables in the same places and colors, so the model clearly recognizes the scene.
+        The ground truth is sharper, with crisper cables and city lights along the shore, while the prediction is softer.
+    </p>
+    <p>
+        <b>The error is concentrated in fine detail.</b> The error maps light up along the cables, the tower outline, and the lights, and stay near zero in flat regions like the sky and water.
+        The error is largest at \(t = 0.25\) and fades by \(t = 0.75\): the more of the image survives in \(x_t\), the less the model has to guess.
+    </p>
+
+    <hr>
+
+    <h2>Part 1.5: Iterative Denoising with Euler Sampling</h2>
+    <p>
+        Instead of jumping straight to \(t = 1\), Euler's method takes many small steps, recomputing the velocity each time:
+        $$ x_{t+h} = x_t + h\,v(x_t, t) $$
+        If the next step would overshoot \(t = 1\), the final step is shortened so the trajectory ends exactly at 1.
+        Because adding 0.02 repeatedly accumulates floating-point error, I compare against 1 with a small tolerance and snap the final time to exactly 1.
+        A constant test velocity confirms the step counts: 50 calls from \(t = 0\), 25 from \(t = 0.5\), and 4 from \(t = 0.93\) (three steps of 0.02 and a final step of 0.01).
+    </p>
+
+<pre><code>@torch.inference_mode()
+def euler_sample(x_start, t_start, step_size, velocity):
+    x, t = x_start, t_start
+    states = [(t, x)]
+    n = 0
+    while 1 - t &gt; 1e-9:
+        h = min(step_size, 1 - t)           # shorten the final step
+        x = x + h * velocity(x, t)
+        t = 1.0 if 1 - (t + h) &lt; 1e-9 else t + h
+        n += 1
+        if n % 5 == 0 or t == 1.0:
+            states.append((t, x))           # every fifth update and the final result
+    return x, states</code></pre>
+
+    <p>
+        I denoised the saved \(t = 0.5\) input with \(h = 0.02\) (25 updates). The noise fades gradually, and the cables and city lights sharpen over the last few steps.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/euler_trajectory.jpg" alt="Euler trajectory">
+        <div class="card-content"><div class="card-title">Initial state, every fifth update, and the final result</div></div>
+    </div>
+
+    <div class="wide card">
+        <img src="./parta/denoise_comparison.jpg" alt="Comparison of denoising methods">
+        <div class="card-content"><div class="card-title">Original, Gaussian blur, one-step, and Euler results on the same t = 0.5 input</div></div>
+    </div>
+
+    <table>
+        <tr><th>Method (t = 0.5 input)</th><th>MSE to the original</th></tr>
+        <tr><td>Gaussian blur (best &sigma;)</td><td>0.0245</td></tr>
+        <tr><td>One-step denoising</td><td>0.0073</td></tr>
+        <tr><td>Euler, 25 steps</td><td>0.0088</td></tr>
+    </table>
+
+    <p>
+        Both model-based methods are far better than the blur. Interestingly, the Euler result looks a bit sharper than the one-step estimate (the cables and water reflections are crisper),
+        but it has a slightly <i>higher</i> error. Iterative sampling commits to specific, plausible fine details, which do not always match my exact photo pixel for pixel.
+        The one-step estimate is closer to an average of the possibilities, and mean squared error favors averages. Lower error does not mean better-looking.
+    </p>
+
+    <hr>
+
+    <h2>Part 1.6: Generating Images from Noise</h2>
+    <p>
+        Starting the Euler sampler at \(t = 0\) from pure noise turns it into a generator. I sampled five independent noise images (seeds 180&ndash;184) and integrated from 0 to 1
+        in 50 updates with <code>"a high quality photo"</code>.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/samples_no_cfg.jpg" alt="Samples without guidance">
+        <div class="card-content"><div class="card-title">Five samples without guidance</div><div class="offset-info">seeds 180, 181, 182, 183, 184</div></div>
+    </div>
+
+    <p>
+        The generic prompt led the model to portraits of people in every sample. The quality is inconsistent: seed 182 and 184 look like somewhat believable photos,
+        but seed 180's face is fully missing and seed 183's face and body are very distorted. Without guidance, the model only weakly follows the prompt, and samples often end up off the image distribution.
+    </p>
+
+    <hr>
+
+    <h1>Part 2: Conditional Generation and Guidance</h1>
+
+    <h2>Part 2.1: Classifier-Free Guidance</h2>
+    <p>
+        Classifier-free guidance evaluates the model twice at the same \(x\) and \(t\): once with the prompt and once with the empty prompt as a null condition.
+        It then pushes the velocity further in the direction the prompt points:
+        $$ v_{\text{cfg}} = v_c + w\,(v_c - v_u) $$
+        With \(w = 0\) this is the ordinary conditional prediction, which I checked with an exact equality test.
+    </p>
+
+<pre><code>def cfg_velocity(x, t, condition, w, predict_velocity, null_condition=''):
+    v_c = predict_velocity(x, t, condition)
+    v_u = predict_velocity(x, t, null_condition)
+    return v_c + w * (v_c - v_u)</code></pre>
+
+    <p>
+        I generated five images with \(w = 7\) and \(h = 0.02\), using the same five initial noises as Part 1.6.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/samples_cfg.jpg" alt="Samples with guidance">
+        <div class="card-content"><div class="card-title">Five samples with CFG, w = 7</div><div class="offset-info">same seeds as Part 1.6</div></div>
+    </div>
+
+    <p>
+        Guidance makes a big difference. All five images are now much more believable headshots with distinct eyes and skin, including seeds 180 and 183, which were distorted without guidance.
+        Because the initial noise is the same, some of the layout carries over: seed 182 still has a hand raised to the face, and the lighting and framing roughly follow the unguided samples.
+        The tradeoff is variety: with guidance, every sample is a centered, front-facing portrait on a plain background, so the images are higher quality but much more alike.
+    </p>
+
+    <hr>
+
+    <h1>Part 3: Creative Applications</h1>
+    <p>
+        All Part 3 results use \(h = 0.02\), \(w = 7\), and the empty prompt as the null condition.
+    </p>
+
+    <h2>Part 3.1: Image-to-Image Editing</h2>
+    <p>
+        To edit an image, I noise it to a starting time \(t_{\text{start}}\) and then run the guided sampler from there to 1:
+        $$ x_{t_{\text{start}}} = (1 - t_{\text{start}})\,\epsilon + t_{\text{start}}\,x_1 $$
+        The starting time controls how much of the original survives. A small \(t_{\text{start}}\) leaves the input almost pure noise, so the model is free to invent a new image;
+        a large \(t_{\text{start}}\) keeps most of the input fixed. I used the seven starting times 0.02, 0.04, 0.06, 0.10, 0.14, 0.25, and 0.50.
+    </p>
+
+<pre><code>def edit(image, noise, t_start, condition, predict_velocity, w=7, step_size=0.02):
+    x_start = (1 - t_start) * noise + t_start * image
+    guided = lambda x, t: cfg_velocity(x, t, condition, w, predict_velocity, null_condition)
+    return euler_sample(x_start, t_start, step_size, guided)[0]</code></pre>
+
+    <h3>The Campanile</h3>
+    <div class="wide card">
+        <img src="./parta/edit_campanile.jpg" alt="Campanile edits">
+        <div class="card-content"><div class="card-title">Campanile, edited with "a high quality photo"</div></div>
+    </div>
+    <p>
+        Even at \(t = 0.02\), a tall white shape appears where the tower is, against a blue background. By 0.04&ndash;0.06 it becomes a tapered white tower with trees below, in the right place but with none of the Campanile's details.
+        At 0.10&ndash;0.14 it gains a simplified top with a single window, at 0.25 the arched openings and faint clock return, and at 0.50 the result is nearly identical to the original.
+    </p>
+
+    <h3>My images: Golden Gate Bridge and a Thailand landscape</h3>
+    <div class="wide card">
+        <img src="./parta/edit_golden_gate.jpg" alt="Golden Gate edits">
+        <div class="card-content"><div class="card-title">Golden Gate Bridge</div></div>
+    </div>
+    <p>
+        This image shows the progression especially clearly. At 0.02&ndash;0.04, only the dark blue sky survives, and the model falls back on its prior for "a high quality photo": portraits of people.
+        At 0.06 the tower becomes a brick church tower over a city, at 0.10 a glass skyscraper standing on the lit roadway, and at 0.14 it finally becomes a bridge tower, but with no cables.
+        The cables come back at 0.25, and 0.50 is a faithful reconstruction.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/edit_thailand.jpg" alt="Thailand landscape edits">
+        <div class="card-content"><div class="card-title">Thailand landscape</div></div>
+    </div>
+    <p>
+        At 0.02 the result is unrelated (a person on a couch), while 0.04&ndash;0.06 become dry mountain landscapes that keep only the sky-over-hills layout.
+        At 0.10&ndash;0.14 the pink color of the flowering tree survives as a pink patch on the hills, and by 0.25 the flowering tree and pink flowers in the foreground are back in their original places.
+    </p>
+
+    <h3>Editing hand-drawn and web images</h3>
+    <p>
+        I repeated the procedure on a photo from the web (a duck with a flower on its head) and two of my own drawings: a simple painted landscape with flowers, and a cartoon dog surrounded by science doodles.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/edit_duck.jpg" alt="Duck edits">
+        <div class="card-content"><div class="card-title">Web image: duck</div></div>
+    </div>
+    <p>
+        Low starting times produce unrelated images (a face, hands), as before. The most interesting results are at 0.10&ndash;0.14: the model produces a clean, realistic duck,
+        but removes the flower and the rainbow. Edits pull images toward what is typical in the training data, and a flower on a duck's head is not typical. At 0.25 and above, the flower and rainbow are kept.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/edit_flower_field.jpg" alt="Flower field drawing edits">
+        <div class="card-content"><div class="card-title">Drawing 1: painted landscape with flowers</div></div>
+    </div>
+    <p>
+        This drawing stays cartoon-like from 0.10 upward, only slightly cleaned up. Large flat color regions already look like valid clip art, so the model does not feel pushed toward realism.
+        The one photo-like result, a grassy field under a blue sky at 0.04, already loses the drawing's layout.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/edit_dog.jpg" alt="Dog drawing edits">
+        <div class="card-content"><div class="card-title">Drawing 2: scientist dog</div></div>
+    </div>
+    <p>
+        The white background of this drawing turns into white studio product shots at low starting times (a laptop, a person holding papers).
+        At 0.10&ndash;0.14, the dog becomes a smoothly shaded 3D-style dog, and the scribbled equations are reinterpreted as lab equipment like a microscope. From 0.25 on, the drawing is kept almost exactly.
+    </p>
+
+    <h2>Part 3.2: Text-Guided Image Editing</h2>
+    <p>
+        Here I used the same procedure, but replaced <code>"a high quality photo"</code> with a prompt describing the edit I wanted. The image now competes with the prompt:
+        low starting times follow the prompt, and high starting times follow the image.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/text_edit_pencil.jpg" alt="Campanile as pencil">
+        <div class="card-content"><div class="card-title">Campanile</div><div class="offset-info">"photograph of large pencil"</div></div>
+    </div>
+    <p>
+        At 0.02&ndash;0.06 the Campanile becomes a giant sharpened pencil standing in its place, with the trees and sky kept around it. At 0.10 the tower is a pencil-colored shaft with a pencil tip,
+        and from 0.14 on the Campanile's shape and window take over again.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/text_edit_lego.jpg" alt="Golden Gate as lego tower">
+        <div class="card-content"><div class="card-title">Golden Gate Bridge</div><div class="offset-info">"photograph of lego tower"</div></div>
+    </div>
+    <p>
+        At low starting times the bridge tower becomes a colorful toy-brick tower. My favorite results are at 0.10&ndash;0.14, where the tower is made of red bricks and the lit roadway becomes a yellow plastic bar passing through it.
+        At 0.25 the Golden Gate structure returns with a brick texture, and at 0.50 the bridge is back to normal.
+    </p>
+
+    <div class="wide card">
+        <img src="./parta/text_edit_candy.jpg" alt="Thailand landscape as candy field">
+        <div class="card-content"><div class="card-title">Thailand landscape</div><div class="offset-info">"photograph of candy field"</div></div>
+    </div>
+    <p>
+        At 0.02&ndash;0.06 the landscape becomes a field of swirled lollipops under a cloudy sky. At 0.10&ndash;0.14 the mountain silhouette from the original returns behind a field of gumdrops,
+        and at 0.25 the pink flowering tree turns into a bush of lollipops, which is the best mix of the original scene and the prompt. At 0.50 only the pink flowers carry a hint of candy.
+    </p>
+    <p>
+        Across all three, starting times around 0.10&ndash;0.14 were the sweet spot: early enough for the prompt to change what objects are, late enough to keep the original layout.
+    </p>
+
+    <h2>Part 3.3: Visual Anagrams</h2>
+    <p>
+        A visual anagram looks like one thing upright and another when rotated 180&deg;. With \(F\) as the 180&deg; rotation (flipping both spatial axes), each Euler step averages two guided velocities:
+        one for prompt \(a\) on the image as it is, and one for prompt \(b\) on the rotated image, rotated back into the same frame:
+        $$ v = \tfrac{1}{2}\Big(v_{\text{cfg}}(x, t, c_a) + F\big(v_{\text{cfg}}(F(x), t, c_b)\big)\Big) $$
+        Since \(F\) is its own inverse, rotating twice gives back the original image, which I checked with an exact equality test.
+    </p>
+
+<pre><code>def visual_anagrams(noise, condition_a, condition_b, predict_velocity, w=7, step_size=0.02):
+    def velocity(x, t):
+        v_a = cfg_velocity(x, t, condition_a, w, predict_velocity, null_condition)
+        v_b = rotate180(cfg_velocity(rotate180(x), t, condition_b, w, predict_velocity, null_condition))
+        return (v_a + v_b) / 2
+    return euler_sample(noise, 0.0, step_size, velocity)[0]</code></pre>
+
+    <div class="comparison-gallery">
+        <div class="card">
+            <img src="./parta/anagram_church_dolphin.jpg" alt="Church and dolphin anagram">
+            <div class="card-content">
+                <div class="card-title">"a lithograph of a church" / "a lithograph of a dolphin"</div>
+                Upright (left) and rotated 180&deg; (right).
+            </div>
+        </div>
+        <div class="card">
+            <img src="./parta/anagram_cat_garden.jpg" alt="Cat and flower garden anagram">
+            <div class="card-content">
+                <div class="card-title">"an oil painting of a cat" / "an oil painting of a flower garden"</div>
+                Upright (left) and rotated 180&deg; (right).
+            </div>
+        </div>
+    </div>
+
+    <p>
+        <b>Church / dolphin.</b> Upright, the image is a sketched church with a steeple; rotated, the steeple becomes the bottom of the frame and a dolphin swims across the top.
+        Both subjects are recognizable, but the dolphin is visible in both orientations, since its body lies diagonally across the church instead of being built out of the church's own lines.
+    </p>
+    <p>
+        <b>Cat / flower garden.</b> Rotated, the image is clearly a flower garden with white blossoms and red flowers. The cat is subtler: it is easiest to see when the image is viewed small,
+        where the white blossoms form a cat's face and chest, the dark leaves at the top form its ears, and the red flowers look like markings on its fur.
+        Loose, painterly styles helped here, since brush strokes can be read as either fur or petals.
+    </p>
+    <p>
+        Several prompt pairs and seeds were needed. A successful run does not guarantee an illusion: often one prompt dominates both views, or the second subject only appears as texture.
+    </p>
+
+    <h2>Part 3.4: Hybrid Images</h2>
+    <p>
+        A hybrid image looks like one subject from far away and another up close. As in Project 2, this uses frequencies, but here the split is applied to the velocities at every Euler step:
+        the low frequencies come from prompt \(a\) and the high frequencies from prompt \(b\):
+        $$ v = \operatorname{lowpass}(v_a) + v_b - \operatorname{lowpass}(v_b) $$
+        Both guided predictions use the same image and time. The low-pass filter is a Gaussian blur with \(\sigma = 16\) and kernel size 265 at 512&times;512, and
+        \(v_b - \operatorname{lowpass}(v_b)\) is the matching high-pass.
+    </p>
+
+<pre><code>def make_hybrids(noise, condition_a, condition_b, predict_velocity, w=7, step_size=0.02):
+    def velocity(x, t):
+        v_a = cfg_velocity(x, t, condition_a, w, predict_velocity, null_condition)
+        v_b = cfg_velocity(x, t, condition_b, w, predict_velocity, null_condition)
+        return lowpass(v_a) + v_b - lowpass(v_b)
+    return euler_sample(noise, 0.0, step_size, velocity)[0]</code></pre>
+
+    <p>
+        Each result is shown at full size (close) and at 64&times;64 (distant). Squinting or stepping back from the screen also simulates the distant view.
+    </p>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./parta/hybrid_face_flowers.png" alt="Hybrid close view">
+            <div class="card-content">
+                <div class="card-title">Close: "a lithograph of blue flowers"</div>
+            </div>
+        </div>
+        <div class="card">
+            <img class="distant" src="./parta/hybrid_face_flowers_small.png" alt="Hybrid distant view">
+            <div class="card-content">
+                <div class="card-title">Distant: "a lithograph of a girl's face"</div>
+                The same image at 64&times;64.
+            </div>
+        </div>
+    </div>
+
+    <div class="gallery">
+        <div class="card">
+            <img src="./parta/hybrid_cat_waterfall.png" alt="Hybrid close view">
+            <div class="card-content">
+                <div class="card-title">Close: "a lithograph of a waterfall"</div>
+            </div>
+        </div>
+        <div class="card">
+            <img class="distant" src="./parta/hybrid_cat_waterfall_small.png" alt="Hybrid distant view">
+            <div class="card-content">
+                <div class="card-title">Distant: "a lithograph of a cat face"</div>
+                The same image at 64&times;64.
+            </div>
+        </div>
+    </div>
+
+    <p>
+        Up close, both results clearly show the high-frequency prompt: dark blue daisies in the first, and a waterfall between pink cliffs in the second.
+        From far away, the low-frequency prompt only shows up as the overall silhouette. In the first image, the flowers are arranged in a dark arc around a pale oval, like hair around a face,
+        and in the second, the cliffs rise into two points at the top corners, like a cat's ears. The distant subjects are much weaker than the close ones.
+        At \(\sigma = 16\), the low-pass keeps only very coarse layout, and the lithograph style on a white background gives the distant prompt little shading to work with.
+        Subjects with one bold, high-contrast shape (like a skull or a face filling the frame) are more likely to survive the low-pass.
+    </p>
+
+    <hr>
+
+    <h1>Part B: Flow Matching from Scratch</h1>
+    <p>
+        In Part B, I build a UNet and train it on MNIST (28&times;28 grayscale digits, pixel values in \([0, 1]\)), first as a single-step denoiser and then as a flow matching model that generates digits from pure noise.
+    </p>
+
+    <hr>
+
+    <h2>Part 1.1: Implementing the UNet</h2>
+    <p>
+        The UNet is built from a few simple blocks. Every convolutional block is a convolution followed by BatchNorm and GELU:
+    </p>
+    <table>
+        <tr><th>Block</th><th>Layers</th><th>Effect on shape</th></tr>
+        <tr><td>Conv</td><td>Conv2d(k=3, s=1, p=1) + BN + GELU</td><td>changes channels, keeps \(H \times W\)</td></tr>
+        <tr><td>DownConv</td><td>Conv2d(k=3, s=2, p=1) + BN + GELU</td><td>halves \(H \times W\)</td></tr>
+        <tr><td>UpConv</td><td>ConvTranspose2d(k=4, s=2, p=1) + BN + GELU</td><td>doubles \(H \times W\)</td></tr>
+        <tr><td>Flatten</td><td>AvgPool2d(7) + GELU</td><td>7&times;7 &rarr; 1&times;1</td></tr>
+        <tr><td>Unflatten</td><td>ConvTranspose2d(k=7, s=7, p=0) + BN + GELU</td><td>1&times;1 &rarr; 7&times;7</td></tr>
+        <tr><td>ConvBlock</td><td>Conv &rarr; Conv</td><td>changes channels</td></tr>
+        <tr><td>DownBlock</td><td>DownConv &rarr; ConvBlock</td><td>halves \(H \times W\)</td></tr>
+        <tr><td>UpBlock</td><td>UpConv &rarr; ConvBlock</td><td>doubles \(H \times W\)</td></tr>
+    </table>
+    <p>
+        UpConv uses a kernel of 4 instead of 3: for a transposed convolution, the output size is \((H - 1)\cdot s - 2p + k\), so kernel 4 gives exactly \(2H\) (7 &rarr; 14 &rarr; 28),
+        while kernel 3 would give \(2H - 1\) and break the skip connections. Unflatten works the same way: \((1 - 1)\cdot 7 + 7 = 7\).
+    </p>
+    <p>
+        The full UNet goes down to a 1&times;1 bottleneck and back up, concatenating each up-path tensor with the matching down-path tensor (the skip connections).
+        Concatenation stacks channels, which is why the up blocks take \(4D\) and \(2D\) input channels. The final layer is a plain 3&times;3 convolution with no BatchNorm or GELU, since the output can be any value.
+    </p>
+
+<pre><code>def forward(self, x):
+    e1 = self.init_conv(x)                              # (D, 28, 28)
+    e2 = self.down1(e1)                                 # (D, 14, 14)
+    e3 = self.down2(e2)                                 # (2D, 7, 7)
+    z = self.flatten(e3)                                # (2D, 1, 1)
+
+    d = self.unflatten(z)                               # (2D, 7, 7)
+    d = self.up1(torch.cat([d, e3], dim=1))             # 4D in -> (D, 14, 14)
+    d = self.up2(torch.cat([d, e2], dim=1))             # 2D in -> (D, 28, 28)
+    d = self.final_block(torch.cat([d, e1], dim=1))     # 2D in -> (D, 28, 28)
+    return self.out(d)                                  # (1, 28, 28)</code></pre>
+
+    <hr>
+
+    <h2>Part 1.2: Using the UNet to Train a Denoiser</h2>
+    <p>
+        The denoiser is trained to map a noisy digit \(z = x + \sigma\epsilon\), with \(\epsilon \sim \mathcal{N}(0, I)\), back to the clean digit \(x\), using an L2 loss.
+        The figure below shows the noising process for \(\sigma = 0.0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0\). All panels share the same \([0, 1]\) display range, so values pushed outside by the noise show as pure black or white.
+    </p>
+
+    <div class="wide card">
+        <img src="./partb/noising_process.png" alt="Noising process">
+        <div class="card-content"><div class="card-title">MNIST digits at increasing noise levels</div></div>
+    </div>
+
+    <h3>Part 1.2.1: Training</h3>
+    <p>
+        I trained the UNet with \(D = 128\) on the MNIST training set at \(\sigma = 0.5\), with batch size 256, Adam at a learning rate of \(10^{-4}\), and 5 epochs.
+        The noise is sampled when each batch is fetched, so the network sees new noise every epoch.
+    </p>
+
+<pre><code>for epoch in range(num_epochs):
+    for images, _ in tqdm(train_loader):
+        images = images.to(device)
+        noisy = images + noise_level * torch.randn_like(images)   # z = x + sigma * eps
+        outputs = model(noisy)
+        loss = criterion(outputs, images)                         # MSE to the clean digit
+        optimizer.zero_grad(); loss.backward(); optimizer.step()</code></pre>
+
+    <div class="comparison-gallery plot">
+        <div class="card">
+            <img src="./partb/denoiser_loss.png" alt="Denoiser loss">
+            <div class="card-content"><div class="card-title">Training loss</div>Drops quickly in the first ~100 steps, then slowly to about 0.008.</div>
+        </div>
+    </div>
+
+    <div class="wide card">
+        <img src="./partb/denoise_epoch1.png" alt="Denoising after epoch 1">
+        <div class="card-content"><div class="card-title">Test digits after epoch 1: clean, noisy (&sigma; = 0.5), denoised</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./partb/denoise_epoch5.png" alt="Denoising after epoch 5">
+        <div class="card-content"><div class="card-title">Test digits after epoch 5</div></div>
+    </div>
+    <p>
+        After one epoch, every denoised digit is recognizable, but the strokes are blurry and a little speckled. After five epochs, the outputs are clean and sharp and closely match the originals.
+    </p>
+
+    <h3>Part 1.2.2: Out-of-Distribution Testing</h3>
+    <p>
+        The denoiser was only trained at \(\sigma = 0.5\). To see how it generalizes, I tested it on test digits at noise levels it never saw.
+    </p>
+
+    <div class="wide card">
+        <img src="./partb/ood_testing.png" alt="Out-of-distribution testing">
+        <div class="card-content"><div class="card-title">Noisy inputs and denoised outputs for &sigma; = 0.0 to 1.0</div></div>
+    </div>
+    <p>
+        Up to \(\sigma = 0.5\), the outputs are clean. At \(\sigma = 0\), the digit comes back nearly unchanged but slightly blurred, since the model never saw clean inputs during training.
+        At \(\sigma = 0.6\) the results are still mostly good, but at 0.8 and 1.0 they break down: extra strokes appear, the 1 bends into a different shape, and at \(\sigma = 1.0\) it turns into scribbles.
+        The model learned to remove noise of a specific strength, and it under-corrects stronger noise.
+    </p>
+
+    <h3>Part 1.2.3: Denoising Pure Noise</h3>
+    <p>
+        To try to make denoising generative, I trained a fresh UNet with the same settings, but with pure noise \(z = \epsilon\) as the input and a clean digit as the target.
+    </p>
+
+    <div class="wide card">
+        <img src="./partb/pure_noise_epoch1.png" alt="Pure noise after epoch 1">
+        <div class="card-content"><div class="card-title">After epoch 1: input noise, output, and held-out digits for comparison</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./partb/pure_noise_epoch5.png" alt="Pure noise after epoch 5">
+        <div class="card-content"><div class="card-title">After epoch 5</div></div>
+    </div>
+    <div class="comparison-gallery plot">
+        <div class="card">
+            <img src="./partb/pure_noise_loss.png" alt="Pure noise loss">
+            <div class="card-content"><div class="card-title">Training loss</div>Plateaus around 0.07 after about 50 steps.</div>
+        </div>
+    </div>
+
+    <p>
+        <b>What patterns appear?</b> Every output is the same blurry, gray blob, no matter what noise goes in. It looks like several digits overlaid: a faint loop resembling a 0, 8, or 9,
+        brightest where many digits have strokes. The outputs at epoch 5 are almost identical to those at epoch 1.
+    </p>
+    <p>
+        <b>How do they relate to the training images?</b> The blob is roughly the pixel-wise average of the MNIST training set. It resembles all digits a little, but none of them specifically.
+    </p>
+    <p>
+        <b>Why?</b> The input noise is independent of the target digit, so it carries no information about which digit to produce. Under an MSE loss, the best single prediction for an unknown target is its mean,
+        \(\mathbb{E}[x]\), so the network learns to ignore its input and output the average digit. The loss plateaus at the variance of the dataset around that mean and cannot drop further.
+        This is why one-step denoising cannot generate varied samples, and it motivates the iterative approach of flow matching.
+    </p>
+
+    <hr>
+
+    <h2>Part 2: Training a Flow Matching Model</h2>
+    <p>
+        Flow matching trains the UNet to predict the velocity along the straight path from noise \(x_0 \sim \mathcal{N}(0, I)\) to a clean digit \(x_1\):
+        $$ x_t = (1 - t)\,x_0 + t\,x_1, \qquad u(x_t, t) = x_1 - x_0 $$
+        $$ L = \mathbb{E}_{x_0, x_1, t \sim U[0,1]}\,\big\|(x_1 - x_0) - u_\theta(x_t, t)\big\|^2 $$
+        Generation then integrates the predicted velocity from \(t = 0\) to 1 with Euler steps, exactly like Part A.
+    </p>
+
+    <h3>Part 2.1: Adding Time Conditioning to the UNet</h3>
+    <p>
+        The UNet needs to know \(t\), since the right velocity depends on how noisy the input is. An <code>FCBlock</code> (Linear + GELU, then Linear) turns the scalar \(t\) into a vector,
+        which multiplies the feature maps channel by channel at two places: the unflatten output (\(2D\) channels) and the first up block's output (\(D\) channels).
+    </p>
+
+<pre><code>t = t.view(-1, 1).float()                        # (N,) -> (N, 1) for nn.Linear
+t1 = self.fc1_t(t)[:, :, None, None]             # (N, 2D, 1, 1)
+t2 = self.fc2_t(t)[:, :, None, None]             # (N, D, 1, 1)
+...
+d = self.unflatten(z) * t1                       # modulated unflatten
+d = self.up1(torch.cat([d, e3], dim=1)) * t2     # modulated up1</code></pre>
+
+    <h3>Part 2.2: Training the Time-Conditioned UNet</h3>
+    <p>
+        For each batch, I sample a random \(t \sim U[0, 1]\) per image and fresh noise \(x_0\), build \(x_t\), and regress the UNet's output onto \(x_1 - x_0\).
+        I used \(D = 64\), batch size 64, Adam with an initial learning rate of \(10^{-2}\), and an exponential learning rate scheduler with \(\gamma = 0.1^{1/10}\), stepped after each of the 10 epochs.
+        The learning rate decays from \(10^{-2}\) to \(10^{-3}\).
+    </p>
+
+<pre><code>def time_fm_forward(unet, x_1, num_ts):
+    N = x_1.shape[0]
+    x_0 = torch.randn_like(x_1)                          # noise
+    t = torch.rand(N, device=x_1.device)                 # one t per image
+    t_ = t.view(N, 1, 1, 1)
+    x_t = (1 - t_) * x_0 + t_ * x_1
+    u_pred = unet(x_t, t)
+    return nn.functional.mse_loss(u_pred, x_1 - x_0)     # target flow</code></pre>
+
+    <div class="comparison-gallery plot">
+        <div class="card">
+            <img src="./partb/time_loss.png" alt="Time-conditioned loss">
+            <div class="card-content"><div class="card-title">Training loss, time-conditioned UNet</div>Settles around 0.1 and stays noisy.</div>
+        </div>
+    </div>
+    <p>
+        The loss does not approach zero. For a given \(x_t\) and \(t\), many pairs of noise and clean digits are possible, so the best the model can do is predict the average flow,
+        and the leftover variance keeps the loss around 0.1.
+    </p>
+
+    <h3>Part 2.3: Sampling from the Time-Conditioned UNet</h3>
+    <p>
+        Sampling starts from pure noise and takes Euler steps of size \(1/T\) with \(T = 50\). I saved the weights after epochs 1, 5, and 10, and sampled 40 digits from each checkpoint with the same seed,
+        so every grid starts from the same noise.
+    </p>
+
+<pre><code>x = torch.randn(N, C, *img_wh, device=device, generator=g)    # start at t = 0
+dt = 1.0 / num_ts
+for i in range(num_ts):
+    t = torch.full((N,), i * dt, device=device)
+    x = x + dt * unet(x, t)                                   # Euler step along the flow</code></pre>
+
+    <div class="wide card">
+        <img src="./partb/time_samples.png" alt="Time-conditioned samples">
+        <div class="card-content"><div class="card-title">Samples after epochs 1, 5, and 10</div></div>
+    </div>
+    <p>
+        After one epoch, the samples are mostly scribbles. By epoch 5 many are legible digits, and by epoch 10 most are recognizable, though some are still malformed or ambiguous.
+        Since the same noise is used for every grid, the same digit often sharpens in place across epochs. Without class conditioning, the model also has no control over which digit it produces.
+    </p>
+
+    <hr>
+
+    <h3>Part 2.4: Adding Class Conditioning to the UNet</h3>
+    <p>
+        To control which digit is generated, I added two more FCBlocks for the class \(c\), given as a one-hot vector of length 10. The class now scales the features and the time shifts them:
+        $$ \text{unflatten} \leftarrow c_1 \cdot \text{unflatten} + t_1, \qquad \text{up1} \leftarrow c_2 \cdot \text{up1} + t_2 $$
+        To support classifier-free guidance, the class vector is dropped (set to all zeros) for 10% of training examples (\(p_{\text{uncond}} = 0.1\)), so the model also learns to generate without a class.
+    </p>
+
+<pre><code>c = nn.functional.one_hot(c, self.num_classes).float()    # (N,) -> (N, 10)
+if mask is not None:
+    c = c * mask.view(-1, 1).float()                      # mask == 0 -> unconditional
+...
+d = c1 * self.unflatten(z) + t1
+d = c2 * self.up1(torch.cat([d, e3], dim=1)) + t2
+
+# in training:
+mask = (torch.rand(N, device=x_1.device) &gt;= p_uncond).float()</code></pre>
+
+    <h3>Part 2.5: Training the Class-Conditioned UNet</h3>
+    <p>
+        Training is the same as the time-only model, using the labels as the class. I used the same settings: \(D = 64\), batch size 64, 10 epochs, Adam at \(10^{-2}\) with exponential decay.
+    </p>
+
+    <div class="comparison-gallery plot">
+        <div class="card">
+            <img src="./partb/class_loss_comparison.png" alt="Class-conditioned loss">
+            <div class="card-content">
+                <div class="card-title">Training loss, class-conditioned UNet</div>
+                With the scheduler (blue) and with a constant learning rate of 10<sup>-3</sup> (orange).
+            </div>
+        </div>
+    </div>
+
+    <h3>Part 2.6: Sampling from the Class-Conditioned UNet</h3>
+    <p>
+        Sampling uses classifier-free guidance with \(\gamma = 5\) and 300 Euler steps. At each step, the model is evaluated once with the class and once with the class dropped, at the same \(x\) and \(t\):
+        $$ u = u_{\text{uncond}} + \gamma\,(u_{\text{cond}} - u_{\text{uncond}}) $$
+        I generated four instances of each digit, with each row showing the digits 0 through 9, from the epoch 1, 5, and 10 checkpoints using the same seed.
+    </p>
+
+    <div class="wide card">
+        <img src="./partb/class_samples_scheduler.png" alt="Class-conditioned samples with scheduler">
+        <div class="card-content"><div class="card-title">Class-conditioned samples after epochs 1, 5, and 10 (with scheduler)</div></div>
+    </div>
+    <p>
+        Class conditioning makes training converge much faster. Even after one epoch, every row reads 0 through 9 in order, though the strokes are speckled and some digits (like the 4s and 5s) are rough.
+        By epoch 5 the digits are clean, and epoch 10 is cleaner still, with a variety of handwriting styles within each digit.
+    </p>
+
+    <h3>Can we get rid of the learning rate scheduler?</h3>
+    <p>
+        To remove the scheduler, I trained a second, independent class-conditioned model with the same settings but a constant learning rate and no scheduler.
+        To compensate for losing the decay, I used a constant learning rate of \(10^{-3}\), the value the scheduled run ends at, instead of the initial \(10^{-2}\).
+        A constant \(10^{-2}\) would keep the large, noisy updates for the entire run, while \(10^{-3}\) keeps every update stable.
+    </p>
+
+    <div class="wide card">
+        <img src="./partb/class_samples_constant_lr.png" alt="Class-conditioned samples with constant learning rate">
+        <div class="card-content"><div class="card-title">Class-conditioned samples after epochs 1, 5, and 10 (constant learning rate 10<sup>-3</sup>, no scheduler)</div></div>
+    </div>
+    <div class="wide card">
+        <img src="./partb/class_scheduler_comparison.png" alt="Scheduler comparison">
+        <div class="card-content"><div class="card-title">Epoch 10 samples, with the scheduler (left) and with a constant learning rate (right), same seed</div></div>
+    </div>
+
+    <table>
+        <tr><th>Run</th><th>Learning rate</th><th>Final loss (last batch)</th></tr>
+        <tr><td>With scheduler</td><td>10<sup>-2</sup> decaying to 10<sup>-3</sup></td><td>0.0795</td></tr>
+        <tr><td>No scheduler</td><td>constant 10<sup>-3</sup></td><td>0.0783</td></tr>
+    </table>
+
+    <p>
+        The constant learning rate maintained the same performance, and was actually better early in training. Its epoch 1 samples are already clean, while the scheduled run's epoch 1 samples are speckled:
+        the large \(10^{-2}\) steps at the start make the first epoch noisier rather than faster. The loss curves confirm this: the constant-rate run is lower for roughly the first 2,000 steps.
+        By epoch 10, both runs reach about the same loss and produce comparably clean digits. For this model, a single well-chosen constant learning rate is simpler and works just as well as the scheduler.
+    </p>
+
+</body>
+</html>
